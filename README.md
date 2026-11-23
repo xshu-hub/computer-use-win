@@ -1,6 +1,6 @@
 # Windows Computer Use MCP
 
-Windows 桌面操控的独立 MCP 服务和配套 Agent Skill。服务通过标准 MCP stdio 提供窗口查询、UI Automation、截图、OCR、输入、窗口管理和可选的浏览器操作。工具沿用 `windows_computer_use_*` 命名。
+Windows 桌面操控的独立 MCP 服务。服务通过标准 MCP stdio 提供窗口查询、UI Automation、截图、OCR、输入、窗口管理和可选的浏览器操作。工具使用 `windows_computer_use_*` 命名。
 
 ## 运行环境
 
@@ -33,11 +33,7 @@ npm.cmd install --prefix "C:\Tools\WinCU" --ignore-scripts --no-audit --no-fund 
 }
 ```
 
-从源码运行时，把参数换成源码里的 `mcp/server.mjs` 绝对路径。服务本身没有第三方 Node.js 运行依赖。连接后调用 `windows_computer_use_health`，检查 `ok` 与 `inputDesktopAvailable`。
-
-## 安装 Skill
-
-把仓库里的 [`skills/windows-computer-use`](https://github.com/xshu-hub/computer-use-win/tree/main/skills/windows-computer-use) 文件夹放到目标 Agent 的 Skills 目录。使用 Skill 压缩包时，先解压再复制同名文件夹。校验路径最终为 `windows-computer-use/SKILL.md`。Skill 按 [Agent Skills 规范](https://agentskills.io/specification) 编写。仅支持 MCP 的客户端可直接发现并调用工具。
+从源码运行时，把参数换成源码里的 `mcp/server.mjs` 绝对路径。服务本身没有第三方 Node.js 运行依赖。客户端连接后通过 MCP 发现工具，可调用 `windows_computer_use_health` 检查 `ok` 与 `inputDesktopAvailable`。
 
 ## 常用配置
 
