@@ -43,7 +43,7 @@ const LEASE_PREFIX = 'dsh-client-';
 // A process that runs under a Windows compatibility layer passes
 // __COMPAT_LAYER on to every process it starts, and Edge relaunches itself
 // without the layer: the first process exits 0 about 50 ms after the start,
-// and the new one lacks the DevTools pipe, so every start of the DSH browser
+// and the new one lacks the DevTools pipe, so every start of the agent browser
 // failed (issue #84, Edge 157). The browser starts without the variable, and
 // the switch keeps Edge from relaunching for a layer applied any other way
 // (Playwright passes the same switch); other browsers ignore it.
@@ -117,7 +117,7 @@ function sendWsServerFrame(socket, opcode, payload) {
 }
 
 // Host a signed-in Chromium browser over --remote-debugging-pipe behind a local
-// Windows named pipe so multiple DSH servers can share it with 0 TCP listeners.
+// Windows named pipe so multiple MCP servers can share it with 0 TCP listeners.
 async function hostKeptProfile(configFile) {
   let config;
   try { config = JSON.parse(readFileSync(configFile, 'utf8')); }
@@ -428,10 +428,10 @@ const AGENT_IDLE_MS = 10 * 60 * 1000;
 const AGENT_VISIBLE_IDLE_MS = 2 * 60 * 60 * 1000;
 const MAX_LISTED_TABS = 40;
 const BACKOFF_MS = 60 * 1000;
+// Keep the isolated-world identifier stable for clients sharing a browser.
 const INDICATOR_WORLD = 'DSH browser status';
-// The visible DSH browser shows what it does without covering the page, as
-// Codex's browser agent does: its window is tinted DSH blue, the tab it works in
-// shows a pointer badge as its icon, and a small pointer marks the point it acts
+// The visible agent browser uses a blue window theme and a pointer badge on
+// the active tab. A small pointer marks the point the agent acts
 // on. The pointer lives in a closed shadow root of an isolated world, lets every
 // event through and is hidden from the accessibility tree; all its changes stay
 // inside the shadow root, so the page's mutation observers never see them.
@@ -452,7 +452,7 @@ const INDICATOR_SCRIPT = '(' + function () {
     '@media (prefers-reduced-motion:reduce){.pointer{transition:opacity .2s}.ring.go{animation:none}}</style>' +
     '<div class="layer"><div class="pointer"><div class="ring"></div><svg width="20" height="24" viewBox="0 0 20 24"><path d="M4 3v16.4l4.1-3.9 2.9 6.3 2.9-1.3-2.8-6.1h5.9z" fill="#4176e6" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg></div></div>';
   const layer = shadow.querySelector('.layer'), pointer = shadow.querySelector('.pointer'), ring = shadow.querySelector('.ring');
-  // The tab icon: the page's own icon links point at the badge while DSH works
+  // The tab icon: the page's own icon links point at the badge while the agent works
   // and get their addresses back afterwards. A link added for a page without
   // one is turned into a touch icon before it goes, so Chrome drops the badge.
   let saved = null;
@@ -490,8 +490,8 @@ const INDICATOR_SCRIPT = '(' + function () {
   globalThis.__dshStatus('idle');
   document.addEventListener('DOMContentLoaded', () => globalThis.__dshStatus(state), { once: true });
 }.toString() + ')();';
-// How long a tab keeps its working badge after DSH's last call there. In DSH
-// the badge stays for the whole turn, as long as the host holds the series.
+// How long a tab keeps its badge after the last call. A host that tracks an
+// operation series can keep the badge active for the full series.
 const INDICATOR_LINGER_MS = 2500;
 
 export const NEW_TAB_ID = 'new-tab';
@@ -1178,7 +1178,7 @@ export class BrowserLane {
     // watcher are detached so another active MCP client can retain them.
     // No extensions: other programs register theirs for every new Chrome
     // profile (a PDF editor, a download manager), each with an install prompt.
-    // A visible agent browser is tinted DSH blue, so its window is never taken
+    // A visible agent browser is tinted blue, so its window is never taken
     // for the user's own browser. On a kept profile, --restore-last-session
     // keeps the session cookies of sites that sign in without "remember me";
     // with no startup window it reopens none of the last tabs (Edge 156).
@@ -1306,7 +1306,7 @@ export class BrowserLane {
     return browser;
   }
 
-  // A DSH browser may still run on the kept profile: another server's, or one
+  // An agent browser may still run on the kept profile: another server's, or one
   // a server left when it ended without closing it. A second launch would only
   // hand its window to that browser, so the lane connects to it instead. The
   // live-client leases decide when it can close, regardless of which client
@@ -1688,7 +1688,7 @@ export class BrowserLane {
   }
 
   // The visible agent browser badges every tab it works in; a user's browser
-  // badges tabs DSH opened or tabs the user approved for this run.
+  // badges tabs the agent opened or tabs the user approved for this run.
   showsIndicator(tab) {
     return tab.browser.source === 'agent' ? !tab.browser.headless : Boolean(tab.opened || tab.userTabApproved);
   }
@@ -1966,7 +1966,7 @@ export class BrowserLane {
     let covering = null;
     // The hit test is best effort: a failure here leaves the click to the page.
     // Like a real click it passes through pointer-events:none layers (a page's
-    // decoration, DSH's own pointer layer); ignorePointerEventsNone would hit them.
+    // decoration, the agent pointer layer); ignorePointerEventsNone would hit them.
     try {
       const hit = await this.frames.hit(tab, backendNodeId, x, y);
       if (!sameFrameNode(hit.backendNodeId, backendNodeId)) {
@@ -2561,7 +2561,7 @@ export class BrowserLane {
     const scale = cssScale / ratio;
     // Always clipped to the visual viewport: without a clip the image also holds
     // the scroll bars and no longer matches the page area or the stated size.
-    // DSH's pointer is hidden meanwhile: the image shows the page alone.
+    // The agent pointer is hidden meanwhile: the image shows the page alone.
     try {
       const data = await this.capture(tab, { format: 'png', clip: { x: view.pageX, y: view.pageY, width: view.clientWidth, height: view.clientHeight, scale } });
       const png = Buffer.from(data, 'base64');

@@ -9,7 +9,7 @@ export function backgroundDesktopArgs(name) {
     fileURLToPath(new URL('../scripts/background-desktop.ps1', import.meta.url)), '-DesktopName', name];
 }
 
-// The server asks the DSH adapter for the hidden desktop by writing this file
+// The server asks the desktop owner for the hidden desktop by writing this file
 // next to the one where the adapter then puts the desktop's name.
 export const backgroundRequestFile = file => file.replace(/\.json$/i, '') + '-request.json';
 

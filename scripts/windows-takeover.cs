@@ -1,4 +1,4 @@
-// Original Windows UI for DSH. Uses only framework APIs; no input is synthesized.
+// Windows desktop takeover indicators. Uses only framework APIs; no input is synthesized.
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -51,7 +51,7 @@ namespace DshTakeover {
     public T Deserialize<T>(string text) { return inner.Deserialize<T>(text); }
 #endif
   }
-  // The words drawn here arrive with each command, in the DSH interface
+  // The words drawn here arrive with each command, in the configured interface
   // language (mcp/overlay-strings.mjs, #74). A missing key shows as itself.
   internal static class Words {
     static Dictionary<string,object> current = new Dictionary<string,object>();
@@ -177,7 +177,7 @@ namespace DshTakeover {
 
   // Where the user's own mouse last moved, for the overlay's lock button. A
   // low-level hook records local and remote-desktop mouse movement. Only
-  // injected movement bearing DSH's input marker is skipped; remote tools
+  // injected movement bearing the agent's input marker is skipped; remote tools
   // also set LLMHF_INJECTED. SetCursorPos never reaches the hook.
   // The hook stores one number, so system input never waits on the overlay.
   internal sealed class PointerWatch : IDisposable {
@@ -186,7 +186,7 @@ namespace DshTakeover {
     IntPtr hook; volatile uint threadId; long packed; volatile bool seen, testFed, disposed;
     internal PointerWatch() {
       callback = OnMouse;
-      new Thread(Run) { IsBackground = true, Name = "DSH overlay pointer" }.Start();
+      new Thread(Run) { IsBackground = true, Name = "Computer Use overlay pointer" }.Start();
       ready.WaitOne(2000);
     }
     internal bool Active { get { return hook != IntPtr.Zero; } }
@@ -252,7 +252,7 @@ namespace DshTakeover {
     internal KeyboardWatch(string eventName, Func<int,bool,bool,bool> onKey) {
       handle=onKey;callback=OnKey;
       available=new EventWaitHandle(false,EventResetMode.ManualReset,eventName+"-ready");
-      new Thread(Run){IsBackground=true,Name="DSH stop keyboard"}.Start();
+      new Thread(Run){IsBackground=true,Name="Computer Use stop keyboard"}.Start();
       if(!started.WaitOne(3000)||!Active)throw new InvalidOperationException("Could not start the stop keyboard listener");
     }
     internal bool Active {get{return hook!=IntPtr.Zero&&!disposed;}}
@@ -300,7 +300,7 @@ namespace DshTakeover {
       mapping=MemoryMappedFile.CreateOrOpen(name,8);
       view=mapping.CreateViewAccessor(0,8);
       if(!Read(false))throw new InvalidOperationException("Could not initialize shared stop listener");
-      thread=new Thread(Run){IsBackground=true,Name="DSH shared stop"};thread.Start();
+      thread=new Thread(Run){IsBackground=true,Name="Computer Use shared stop"};thread.Start();
     }
     bool Acquire(int timeout) {
       try{return mutex.WaitOne(timeout);}catch(AbandonedMutexException){return true;}
@@ -409,7 +409,7 @@ namespace DshTakeover {
       };
       SyncTimer();
       SystemEventsSubscribe();
-      new Thread(ReadCommands) { IsBackground = true, Name = "DSH takeover control" }.Start();
+      new Thread(ReadCommands) { IsBackground = true, Name = "Computer Use takeover control" }.Start();
       RefreshDisplays(true);
       // The Windows process id: under WSL the server sees only the id of the
       // interop process that started this one (#79).
@@ -739,7 +739,7 @@ namespace DshTakeover {
       if(testMode&&testOverlayCursor.HasValue)cursor=testOverlayCursor.Value;
       else if(!Native.GetCursorPos(out cursor))return;
       // The cursor must still be where the user's last local/remote move left it;
-      // DSH moving it elsewhere (SetCursorPos) breaks the match.
+      // The agent moving it elsewhere (SetCursorPos) breaks the match.
       bool userPointer=pointerWatch.Latest(out moved)&&Math.Abs(moved.x-cursor.x)<=2&&Math.Abs(moved.y-cursor.y)<=2;
       progress.TrackPointer(cursor,userPointer);
     }
@@ -856,7 +856,7 @@ namespace DshTakeover {
     // passes the mouse through, resting the user's own pointer on it for a
     // moment unlocks the window, so it can be moved and resized; once the
     // pointer has been away for a while it locks again. The saved lock setting
-    // is not changed, and DSH's own pointer moves never count (userPointer=false).
+    // is not changed, and the agent's own pointer moves never count (userPointer=false).
     internal void TrackPointer(Native.Point cursor,bool userPointer){
       if(IsDisposed)return;
       var now=DateTime.UtcNow;var at=new Point(cursor.x-Left,cursor.y-Top);
@@ -940,7 +940,7 @@ namespace DshTakeover {
     static bool Flag(Dictionary<string,object> data,string key){object v;if(data==null||!data.TryGetValue(key,out v)||v==null)return false;try{return Convert.ToBoolean(v);}catch(FormatException){return false;}}
     internal static long Whole(Dictionary<string,object> data,string key){object v;if(data==null||!data.TryGetValue(key,out v)||v==null)return 0;try{return Convert.ToInt64(v);}catch(FormatException){return 0;}catch(InvalidCastException){return 0;}catch(OverflowException){return 0;}}
     static string Shorten(string text,int limit){text=text.Trim();return text.Length>limit?"…"+text.Substring(text.Length-limit+1):text;}
-    // DSH renders Markdown, so plain text shows the same words without the
+    // The conversation renders Markdown, so plain text shows the same words without the
     // marks; paragraphs follow each other without blank lines in a small window.
     static readonly System.Text.RegularExpressions.Regex RxCodeFence=new System.Text.RegularExpressions.Regex(@"(?m)^[ \t]*```[^\n]*\n?",System.Text.RegularExpressions.RegexOptions.Compiled);
     static readonly System.Text.RegularExpressions.Regex RxImage=new System.Text.RegularExpressions.Regex(@"!\[([^\]\n]*)\]\([^)\n]*\)",System.Text.RegularExpressions.RegexOptions.Compiled);
@@ -975,7 +975,7 @@ namespace DshTakeover {
       revealedResult=true;
       if(TotalHeight-at*LineHeight>viewport.Height){scrollY=Math.Min(MaxScroll,at*LineHeight);followOutput=false;LayoutScrollbar();}
     }
-    // One heading per model step ("Step 3 · Scroll the page"), then the text DSH
+    // One heading per model step ("Step 3 · Scroll the page"), then the text the agent
     // showed for that step. Older steps keep only their last lines; the current
     // step and the reply are shown in full.
     static string StepHeading(Dictionary<string,object> entry){
@@ -1216,7 +1216,8 @@ namespace DshTakeover {
         // A solid name tag just past the arrow, like collaborative cursors.
         using(var font=new Font("Segoe UI",10,FontStyle.Bold,GraphicsUnit.Pixel))
         using(var format=new StringFormat(StringFormat.GenericTypographic) { Alignment=StringAlignment.Center, LineAlignment=StringAlignment.Center }) {
-          float w=(float)Math.Ceiling(g.MeasureString("DSH",font,PointF.Empty,format).Width)+14,h=19;
+          const string label = "Agent";
+          float w=(float)Math.Ceiling(g.MeasureString(label,font,PointF.Empty,format).Width)+14,h=19;
           // Below-right clears the pointer's whole extent; the other corners only need to clear the tip.
           float bx=left?x-8-w:up?x+13:x+TagX(extent),by=up?y-10-h:left?y+17:y+TagY(extent);
           using(var shadow=Frame.Rounded(new RectangleF(bx,by+1.5f,w,h),6)) using(var brush=new SolidBrush(Color.FromArgb(60,0,0,0))) g.FillPath(brush,shadow);
@@ -1224,7 +1225,7 @@ namespace DshTakeover {
             using(var fill=new SolidBrush(Color.FromArgb(255,57,100,254)))g.FillPath(fill,shape);
             using(var outline=new Pen(Color.FromArgb(240,255,255,255),1.25f))g.DrawPath(outline,shape);
           }
-          using(var brush=new SolidBrush(Color.White))g.DrawString("DSH",font,brush,new RectangleF(bx,by+.5f,w,h),format);
+          using(var brush=new SolidBrush(Color.White))g.DrawString(label,font,brush,new RectangleF(bx,by+.5f,w,h),format);
         }
       }
       return image;
@@ -1282,7 +1283,7 @@ namespace DshTakeover {
         g.Clear(Color.Transparent);
         float scale = dpiScale > 0f ? dpiScale : Math.Max(1f, Math.Min(2f, width/1920f));
         // Edge glow: a bright core line that reads on dark wallpapers, then a
-        // DeepSeek-blue falloff that reads on light ones.
+        // blue falloff that reads on light ones.
         g.CompositingMode = CompositingMode.SourceCopy;
         int core = (int)Math.Round(2*scale), glow = core+(int)Math.Round(18*scale);
         for (int i=0;i<glow;i++) {

@@ -32,7 +32,7 @@ const SERVER_VERSION = (() => {
   try {
     return JSON.parse(readFileSync(path.join(pluginRoot, "package.json"), "utf8")).version;
   } catch {
-    return "0.1.1";
+    return "0.1.2";
   }
 })();
 const backendPath = path.join(pluginRoot, "scripts", "windows-uia.ps1");
@@ -629,16 +629,14 @@ const initialNames = toolMode === 'lazy' ? [discoveryName] : configuredSelection
 const enabledTools = new Set(initialNames);
 // Models infer what a server can do from the names of its tools. A Lazy startup
 // advertises the management entry alone, so no capability name is left to infer
-// from. MCP instructions are the channel for that statement: DSH publishes them
-// as a system-prompt section attributed to this server.
+// from. MCP initialization instructions describe the server's capabilities.
 const capabilityInstructions = 'Windows Computer Use reads and operates Windows apps (window lists, UI Automation, screenshots, OCR, input, window management). Tools start unloaded: call windows_computer_use_tools with operation "enable" and needed names (or ["*"] for all allowed tools), or "describe" for full arguments. Prefer UIA elements over screen coordinates, then observe again to verify.';
 // A Custom checklist that allows no desktop tool must not claim the capability:
 // enabling one is refused, and saying otherwise contradicts the user's setting.
 const managementOnly = initialNames.length === 1 && initialNames[0] === discoveryName
   && [...allowedTools].some(name => name !== discoveryName);
 const desktopInstructions = allowedTools.has(prefix+'keypress') ? '\n\nExcel: select an exact range with Ctrl+G and enter its address in the observed Go To dialog, not a worksheet cell or formula bar. For Ribbon key tips use one keypress with keys and thenKeys, e.g. keys:["alt","h"], thenKeys:[["o"],["w"]] opens Column Width without returning focus between chords; type a value such as the width only after the dialog is observed, since keys sent while a key tip did not engage land in the cell. Prefer numeric column widths or AutoFit to dragging boundaries. For long text, set bounded widths, enable Wrap Text in Format Cells > Alignment, then AutoFit Row Height; inspect the saved result.' : '';
-// Saved settings the DSH adapter reset to their defaults (dsh-plugin.mjs)
-// surface in health and the tools list (#39).
+// An adapter may include startup setting notices in health and the tools list.
 let adapterNotices = null;
 try { adapterNotices = process.env.WCU_ADAPTER_NOTICES ? JSON.parse(process.env.WCU_ADAPTER_NOTICES) : null; } catch {}
 const discoveryTool = {
@@ -736,7 +734,7 @@ function validateArguments(schema, value, location = "arguments") {
   return value;
 }
 
-// DSH hosts can retain/serialize raw MCP image blocks even when their text
+// MCP hosts can retain or serialize raw MCP image blocks even when their text
 // preview says "content discarded". Its adapter requests file mode so no
 // binary payload reaches the tool result. Standalone MCP keeps inline images.
 const BROWSER_SHOT_DIR = path.join(os.tmpdir(), 'dsh-wcu-browser-screenshots');
@@ -747,7 +745,7 @@ async function screenshotOutput(screenshot, includeImage = true) {
   if (!screenshot) return { metadata: screenshot, content: [] };
   const { base64, ...metadata } = screenshot;
   // The backend saves desktop captures under the Windows TEMP. Under WSL,
-  // DSH's file tools read them through /mnt (#79).
+  // Host file tools can read them through /mnt (#79).
   if (IN_WSL && metadata.path) metadata.path = linuxPath(metadata.path);
   if (process.env.WCU_IMAGE_MODE === 'file') {
     if (includeImage && !metadata.path) {
@@ -783,7 +781,7 @@ async function screenshotOutput(screenshot, includeImage = true) {
 // killed and respawned lazily on the next call.
 // ----------------------------------------------------------------------------
 // The backend on the user's desktop, and one on the service's hidden desktop, where Low
-// disruption opens the apps DSH starts. Each call goes to the backend whose
+// disruption opens the apps the agent starts. Each call goes to the backend whose
 // desktop holds its window (deskFor).
 const backends = { current: null, background: null };
 let backendNextId = 0;
@@ -823,14 +821,14 @@ const routingInstructions = browserLane.disabled
   }, [...allowedTools].map(name => name.slice(prefix.length)));
 const serverInstructions = [...allowedTools].some(name => name !== discoveryName)
   ? (managementOnly ? capabilityInstructions + '\n\n' : '') + routingInstructions + desktopInstructions : undefined;
-// A tab DSH works in keeps its badge until the host ends the operation series.
+// A tab the agent works in keeps its badge until the host ends the operation series.
 const userStopped = () => takeover.paused && takeover.pauseMessage === STOPPED;
 browserLane.seriesActive = () => takeover.seriesHeld && !userStopped();
 
 // Browser-lane calls work inside the page in the background; the user keeps
 // the pointer, the keyboard and the foreground. They take a quiet lease: it
 // honours a stopped series and holds settings reconnects, but shows no screen
-// indicator and arms no global Esc. DSH's stop button cancels them.
+// indicator and arms no global Esc. MCP request cancellation can stop them.
 async function runBrowser(action, args, request) {
   let acquired = false;
   const prepared = takeoverSetup.then(async () => {
@@ -916,8 +914,8 @@ function failBackendWaiters(error, proc) {
 }
 
 // The backend never runs Node, and programs that launch_app starts on the local
-// background desktop inherit its environment. DSH sets ELECTRON_RUN_AS_NODE for
-// this server; passed on, it makes an Electron app such as VS Code run as Node
+// background desktop inherit its environment. Some hosts set ELECTRON_RUN_AS_NODE for
+// this server. If inherited, it makes Electron apps run as Node
 // with no window.
 const BACKEND_PRIVATE_ENV = new Set(['WCU_APPROVAL_SECRET', 'WCU_APPROVAL_LEDGER', 'ELECTRON_RUN_AS_NODE']);
 function backendEnv(env) {
@@ -1039,10 +1037,9 @@ function killBackends(error) {
   for (const proc of Object.values(backends)) if (proc) killBackend(error, proc);
 }
 
-// DSH's hidden desktop. Inside DSH the adapter owns it (dsh-plugin.mjs), so the
-// apps on it outlive an MCP restart: this server asks for it with a request
-// file and reads its name from WCU_BACKGROUND_FILE. A server started on its own
-// owns one itself, which closes when the server exits. A server that already
+// The hidden desktop normally belongs to this process and closes with it.
+// A host can supply a desktop through WCU_BACKGROUND_FILE, allowing apps
+// on that desktop to outlive an MCP restart. A server that already
 // runs on a hidden desktop (WCU_BACKGROUND_DESKTOP) uses no second one.
 const hiddenDesktopSupported = process.platform === 'win32' && !IN_WSL && !backgroundDesktop;
 let ownedHiddenDesktop, hiddenStarting;
@@ -1084,11 +1081,9 @@ async function ensureHiddenBackend(request) {
   return hiddenStarting;
 }
 
-// The user's work mode, read live from settings: quiet (Low disruption, the
-// default) or fast (Foreground). Inside a Hyper-V guest the whole machine is
-// DSH's, so it works as Foreground there. A server started without DSH's
-// settings keeps the behaviour of earlier versions (direct): the foreground
-// as the agent asks, no wait for the user, apps on the user's desktop.
+// Configured work modes are quiet (Low disruption) and fast (Foreground).
+// Direct is the default without a work mode setting: respect the requested
+// foreground behavior and launch apps on the current desktop.
 const modeFromSettings = Boolean(process.env.WCU_CONFIG_FILE) || Object.hasOwn(startupSettings, 'desktopTarget');
 function workMode() {
   if (['quiet', 'fast', 'direct'].includes(process.env.WCU_WORK_MODE)) return process.env.WCU_WORK_MODE;
@@ -1678,7 +1673,7 @@ async function launchApp(args, request) {
 async function backendText(action, args, timeoutMs, request, desk) {
   const result = desk ? await runBackendOn(desk, action, args, timeoutMs, request) : await runBackend(action, args, timeoutMs, request);
   if (inputActions.has(action)) {
-    // Keys and text without a window target, before DSH has worked in any
+    // Keys and text without a window target, before the agent has worked in any
     // window this turn, reach whatever window is in front (issue #82).
     const guessed = result.deliveredTo?.via === "front window";
     result.verification = guessed || result.moved === false || result.posted === false || result.activated === false ? "unconfirmed" : result.verification ?? "sent";
@@ -1903,7 +1898,7 @@ function shutdown(code) {
 
 function maybeExitAfterStdinEnd() {
   if (stdinEnded && pendingRequests === 0) {
-    // A kept-profile DSH browser closes itself first, saving its last cookies.
+    // A persistent agent browser closes itself first, saving its last cookies.
     void shutdown(0);
   }
 }

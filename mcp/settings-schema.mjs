@@ -15,7 +15,7 @@ export const SETTINGS_SCHEMA = Object.freeze(Object.fromEntries(Object.entries({
   desktopTarget: choice(['quiet','fast','hyperv'], 'quiet', '工作方式 / Work mode'),
   hypervVm: {type:'text',default:'',maxLength:120,allowEmpty:true,description:'Hyper-V 虚拟机名称 / Hyper-V virtual machine name'},
   browserFirst: toggle(true, '网页优先使用浏览器通道 / Prefer browser use for web pages'),
-  browserVisible: toggle(true, '显示DSH浏览器窗口 / Show the DSH browser'),
+  browserVisible: toggle(true, '显示专用浏览器窗口 / Show the agent browser'),
   browserApp: choice(BROWSER_APPS, 'default', '使用的浏览器 / Browser'),
   browserSignIn: toggle(true, '记住登录 / Keep sign-ins'),
   browserAttachUser: toggle(false, '连接我自己的浏览器 / Attach to my own browser'),

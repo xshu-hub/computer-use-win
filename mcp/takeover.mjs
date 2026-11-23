@@ -31,11 +31,11 @@ export const DEFAULT_POWERSHELL=process.platform==='win32'
   ? path.win32.join(process.env.SystemRoot||process.env.WINDIR||'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe')
   : 'powershell.exe';
 
-// WSL (#79): DSH and this server can run inside WSL and reach powershell.exe
+// Interop path helpers convert paths when reaching powershell.exe
 // through interop. A Windows process resolves a Linux path such as
 // /home/me/x.ps1 against its own current drive, so started from /mnt/c it
 // looked for C:\home\me\x.ps1. Scripts therefore get their Windows form
-// (wslpath -w), Windows paths in results get their Linux form for DSH's file
+// (wslpath -w), Windows paths in results get their Linux form for host file
 // tools, and a variable set here reaches a Windows process only when WSLENV
 // names it.
 const readText = file => { try { return readFileSync(file, 'utf8'); } catch { return ''; } };
@@ -148,7 +148,7 @@ export class TakeoverControl {
   constructor({ powershell = DEFAULT_POWERSHELL, onStop = () => {}, configFile = process.env.WCU_CONFIG_FILE,
     stateFile = process.env.WCU_STATE_FILE, activityFile=process.env.WCU_ACTIVITY_FILE,testMode = false, config = {}, locale } = {}) {
     this.powershell = powershell; this.onStop = onStop; this.configFile = configFile; this.stateFile = stateFile;
-    // The overlay's language: the DSH interface language the host writes into
+    // The overlay's language: the locale the host writes into
     // the activity file, unless a caller fixes one; standalone, the system's.
     this.fixedLocale = locale; this.locale = overlayLocale(locale ?? systemLocale());
     this.testMode = testMode; this.config = normalizeSettings(config); this.active = 0; this.shown = 0; this.paused = false;

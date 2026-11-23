@@ -108,7 +108,7 @@ public static class WincuBackgroundDesktop {
             Console.WriteLine(name);
             Console.Out.Flush();
             // The adapter holds this pipe across MCP reconnects. EOF also
-            // releases the job if the DSH host terminates unexpectedly.
+            // releases the job if the desktop owner terminates unexpectedly.
             while (Console.In.ReadLine()!=null) {}
         } finally {
             Close(job);

@@ -23,12 +23,12 @@ export function normalizeStopShortcut(value) {
 
 // A saved value this version does not offer (a tool, preset, browser or
 // position chosen in another version, or edited by hand) must not keep the
-// plugin from loading: DSH refuses the whole entry when one value fails, and
+// service from loading: settings validation rejects the whole entry when one value fails, and
 // every tool then disappears with no visible error (#39). Such choices fall
 // back to their defaults and unknown tool names are dropped; each change is
 // returned so it can be reported. Values typed on the settings page (shortcut,
 // text, numbers) stay strict, so a mistyped one is still refused when saved.
-// 0.6.3 turned "where DSH works" into work modes. Both former local choices,
+// An earlier release consolidated desktop targets into work modes. Both former local choices,
 // the current desktop and the background desktop, are now parts of Low
 // disruption (quiet), so a saved one carries over without a reset notice.
 export const LEGACY_DESKTOP_TARGETS = Object.freeze({ current: 'quiet', background: 'quiet' });

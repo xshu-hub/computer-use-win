@@ -97,7 +97,7 @@ export async function acquireProfileLock(lock, { timeoutMs = 30000 } = {}) {
       if (removed && !retriedRemoval) { retriedRemoval = true; continue; }
       if (unexpected || Date.now() >= deadline) {
         const reason = unexpected ? 'The profile lock contains unexpected files.' :
-          pid ? 'The profile lock belongs to running process ' + pid + '.' : 'Another DSH server may be using this browser. Try again.';
+          pid ? 'The profile lock belongs to running process ' + pid + '.' : 'Another MCP server may be using this browser. Try again.';
         throw new Error('BROWSER_PROFILE_BUSY: ' + reason);
       }
       await delay(100);
