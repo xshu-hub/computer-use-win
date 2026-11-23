@@ -1,0 +1,33 @@
+{
+  "name": "windows-computer-use-mcp",
+  "version": "0.1.1",
+  "description": "Windows desktop and browser automation for MCP agents over stdio",
+  "type": "module",
+  "bin": {
+    "wcu-mcp": "mcp/server.mjs"
+  },
+  "files": [
+    "mcp/",
+    "scripts/",
+    "docs/wiki/",
+    "THIRD_PARTY.md"
+  ],
+  "scripts": {
+    "selftest": "node mcp/server.mjs --self-test",
+    "check:native": "powershell.exe -NoProfile -File scripts/build-native.ps1 -Check"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "os": [
+    "win32"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "computer-use",
+    "desktop-automation",
+    "uia",
+    "windows"
+  ]
+}
